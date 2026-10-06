@@ -821,6 +821,10 @@ class TaskLibrary:
         @depends(["create_venv"])
         def diff_coverage_linux_x86_64(self, plan: Plan) -> str:
             build_dir = REPO_ROOT / "build" / "linux-x86_64"
+            # This task deliberately owns test/report generation from an already-built
+            # binary. In coverage CI, that lets the workflow run snapshot-golden preflight
+            # between coverage_build_linux_x86_64 and GenerateCoverageTask, before snapshot
+            # and accuracy tests consume QNN_UT_SNAPSHOT_GOLDEN_DIR.
             return plan.add_step(
                 CompositeTask(
                     "Coverage report and diff from existing build",
