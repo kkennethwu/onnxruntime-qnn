@@ -145,10 +145,21 @@ std::shared_ptr<qnn::RpcMemLibrary> QnnEpFactory::GetOrCreateRpcMemLibrary(std::
     return rpcmem_library_;
   }
 
+  // A missing RPCMEM library will not appear later in the process, so remember the
+  // failure instead of retrying the dynamic load on every allocation or session.
+  if (!rpcmem_library_error_.empty()) {
+    error_message = rpcmem_library_error_;
+    return nullptr;
+  }
+
   try {
     rpcmem_library_ = std::make_shared<qnn::RpcMemLibrary>();
   } catch (const std::exception& e) {
-    error_message = e.what();
+    rpcmem_library_error_ = e.what();
+    if (rpcmem_library_error_.empty()) {
+      rpcmem_library_error_ = "Unknown error while loading RPCMEM.";
+    }
+    error_message = rpcmem_library_error_;
   }
   return rpcmem_library_;
 }

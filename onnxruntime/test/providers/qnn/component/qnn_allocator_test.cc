@@ -26,7 +26,10 @@ TEST(QnnUnit_AllocatorTest, Alloc_DeferredRpcMemProvider_LoadsOnFirstAllocation)
   EXPECT_EQ(provider_call_count, 0u)
       << "Constructing the allocator during EP registration must not load RPCMEM.";
 
-  EXPECT_THROW(qnn::HtpSharedMemoryAllocator::AllocImpl(&allocator, 64), Ort::Exception);
+  // AllocImpl is a C ABI callback, so a load failure is reported as nullptr rather than an exception.
+  void* allocation = nullptr;
+  EXPECT_NO_THROW(allocation = qnn::HtpSharedMemoryAllocator::AllocImpl(&allocator, 64));
+  EXPECT_EQ(allocation, nullptr);
   EXPECT_EQ(provider_call_count, 1u)
       << "The RPCMEM provider should first be invoked by an actual allocation.";
 }

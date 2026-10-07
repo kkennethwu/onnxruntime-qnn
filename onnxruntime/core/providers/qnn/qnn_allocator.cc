@@ -146,7 +146,21 @@ std::shared_ptr<RpcMemLibrary> HtpSharedMemoryAllocator::GetOrCreateRpcMemLibrar
 
 void* ORT_API_CALL HtpSharedMemoryAllocator::AllocImpl(struct OrtAllocator* this_, size_t requested_size) {
   HtpSharedMemoryAllocator* allocator = static_cast<HtpSharedMemoryAllocator*>(this_);
-  auto rpcmem_library = allocator->GetOrCreateRpcMemLibrary();
+  // This is a C ABI callback invoked by ORT Core, so exceptions must not escape it.
+  // Returning nullptr reports the allocation failure to the caller.
+  try {
+    return allocator->AllocOrThrow(requested_size);
+  } catch (const std::exception& e) {
+    ORT_CXX_LOGF(allocator->logger_, ORT_LOGGING_LEVEL_ERROR, "QnnHtpShared allocation failed: %s", e.what());
+  } catch (...) {
+    ORT_CXX_LOG(allocator->logger_, ORT_LOGGING_LEVEL_ERROR, "QnnHtpShared allocation failed: unknown exception.");
+  }
+  return nullptr;
+}
+
+void* HtpSharedMemoryAllocator::AllocOrThrow(size_t requested_size) {
+  HtpSharedMemoryAllocator* allocator = this;
+  auto rpcmem_library = GetOrCreateRpcMemLibrary();
 
   const size_t shared_memory_block_size_in_bytes = requested_size;
 
