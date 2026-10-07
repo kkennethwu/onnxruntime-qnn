@@ -1605,13 +1605,13 @@ QnnEp::QnnEp(const QnnEpFactory& factory,
     if (!context_cache_enabled_) {
       std::string rpcmem_error;
       rpcmem_library_ = factory.GetOrCreateRpcMemLibrary(rpcmem_error);
+      // The session explicitly opted in, so fail session creation rather than silently
+      // running with a MEMHANDLE graph contract and no shared memory allocator.
       if (rpcmem_library_ == nullptr) {
-        ORT_CXX_LOGF(logger_, ORT_LOGGING_LEVEL_WARNING,
-                     "Unable to load RPCMEM; disabling HTP shared memory allocator: %s",
-                     rpcmem_error.c_str());
-      } else {
-        qnn_allocator_type_ = qnn::QnnAllocatorType::HTP_SHARED;
+        const std::string message = "Unable to load RPCMEM for the HTP shared memory allocator: " + rpcmem_error;
+        LOG_AND_THROW_ERROR(logger_, message.c_str());
       }
+      qnn_allocator_type_ = qnn::QnnAllocatorType::HTP_SHARED;
     } else {
       ORT_CXX_LOGF(logger_,
                    ORT_LOGGING_LEVEL_INFO,

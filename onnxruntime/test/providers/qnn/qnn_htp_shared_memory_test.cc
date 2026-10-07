@@ -109,8 +109,8 @@ bool TryCreateHtpSession(const ORTCHAR_T* model_path,
   try {
     session = Ort::Session{*ort_env, model_path, session_options};
 
-    // Session creation degrades gracefully when RPCMEM is unavailable. Probe
-    // one real allocation so device tests skip for that condition as well.
+    // Session creation fails with an RPCMEM error when the library cannot be
+    // loaded. Also probe one real allocation, which returns nullptr on failure.
     Ort::MemoryInfo info_shared("QnnHtpShared", OrtDeviceAllocator, 0, OrtMemTypeCPU);
     Ort::Allocator allocator(session, info_shared);
     auto probe = allocator.GetAllocation(64);
@@ -316,17 +316,12 @@ TEST_F(QnnHTPBackendTests, htp_shared_memory_factory_allocator_pre_session) {
     factory_allocator->Free(factory_allocator, input_ptr);
     factory_allocator->Free(factory_allocator, output_ptr);
   });
-  try {
-    input_ptr = factory_allocator->Alloc(factory_allocator, x_values.size() * sizeof(float));
-    output_ptr = factory_allocator->Alloc(factory_allocator, x_values.size() * sizeof(float));
-  } catch (const Ort::Exception& e) {
-    if (IsRpcMemUnavailable(e)) {
-      GTEST_SKIP() << "HTP shared memory allocator is unavailable.";
-    }
-    throw;
+  // Alloc is a C ABI callback; an RPCMEM failure is reported as nullptr, not an exception.
+  input_ptr = factory_allocator->Alloc(factory_allocator, x_values.size() * sizeof(float));
+  output_ptr = factory_allocator->Alloc(factory_allocator, x_values.size() * sizeof(float));
+  if (input_ptr == nullptr || output_ptr == nullptr) {
+    GTEST_SKIP() << "HTP shared memory allocator is unavailable.";
   }
-  ASSERT_NE(input_ptr, nullptr);
-  ASSERT_NE(output_ptr, nullptr);
   memcpy(input_ptr, x_values.data(), sizeof(float) * x_values.size());
 
   Ort::Value bound_x = Ort::Value::CreateTensor(info_shared, reinterpret_cast<float*>(input_ptr),
@@ -536,16 +531,12 @@ TEST_F(QnnHTPBackendTests, shared_ortvalue_without_session_allocator_falls_back_
       env_allocator->Free(env_allocator, buffer);
     }
   });
-  try {
-    for (void*& buffer : buffers) {
-      buffer = env_allocator->Alloc(env_allocator, nbytes);
-      ASSERT_NE(buffer, nullptr);
-    }
-  } catch (const Ort::Exception& e) {
-    if (IsRpcMemUnavailable(e)) {
+  // Alloc is a C ABI callback; an RPCMEM failure is reported as nullptr, not an exception.
+  for (void*& buffer : buffers) {
+    buffer = env_allocator->Alloc(env_allocator, nbytes);
+    if (buffer == nullptr) {
       GTEST_SKIP() << "HTP shared memory allocator is unavailable.";
     }
-    throw;
   }
   for (size_t i = 0; i < 3; ++i) {
     memcpy(buffers[i], input_values.data(), nbytes);

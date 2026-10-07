@@ -98,6 +98,7 @@ class HtpSharedMemoryAllocator : public OrtAllocator {
 
  private:
   std::shared_ptr<RpcMemLibrary> GetOrCreateRpcMemLibrary();
+  void* AllocOrThrow(size_t requested_size);
 
   Ort::Status GetAllocationSharedMemoryInfoForThisAllocator(void* allocation_base_address,
                                                             SharedMemoryInfo& allocation_info);

@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include "core/providers/qnn/ort_api.h"
@@ -103,6 +104,7 @@ class QnnEpFactory : public OrtEpFactory, public ApiPtrs {
   // registering the factory and its environment allocator must remain usable on
   // hosts without RPCMEM (for example, offline context generation on x86).
   mutable std::shared_ptr<qnn::RpcMemLibrary> rpcmem_library_;
+  mutable std::string rpcmem_library_error_;
   mutable std::mutex rpcmem_library_mutex_;
 
   QnnEp* qnn_ep_ = nullptr;

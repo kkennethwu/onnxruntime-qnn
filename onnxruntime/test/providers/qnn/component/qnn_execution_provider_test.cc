@@ -631,6 +631,31 @@ TEST_F(QnnUnit_ExecutionProviderTest, Ctor_ContextGenerationWithoutRpcmem_Preser
   EXPECT_EQ(ep_ptr->GetDefaultMemoryDevice(ep_ptr, &default_device), nullptr);
   EXPECT_EQ(default_device, nullptr);
 }
+
+TEST_F(QnnUnit_ExecutionProviderTest, Ctor_InferenceOptInWithoutRpcmem_Throws) {
+  EpStubContext ctx;
+  ctx.session_config[EPKey("enable_htp_shared_memory_allocator")] = "1";
+  auto factory = MakeFactory(ctx);
+
+  // An explicit opt-in that cannot be honoured must fail session creation instead of
+  // silently building a MEMHANDLE graph with no shared memory allocator.
+  try {
+    auto ep = MakeEp(*factory, ctx);
+    FAIL() << "Expected session creation to fail when RPCMEM is unavailable.";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string{e.what()}.find("Failed to initialize RPCMEM dynamic library handle"), std::string::npos)
+        << e.what();
+  }
+
+  // The failure is cached by the factory, so a second session fails the same way.
+  try {
+    auto ep = MakeEp(*factory, ctx);
+    FAIL() << "Expected the cached RPCMEM failure to be reported again.";
+  } catch (const std::runtime_error& e) {
+    EXPECT_NE(std::string{e.what()}.find("Failed to initialize RPCMEM dynamic library handle"), std::string::npos)
+        << e.what();
+  }
+}
 #endif
 
 TEST_F(QnnUnit_ExecutionProviderTest, Ctor_SharedBackendManagerWithDifferentAllocatorMode_Throws) {
